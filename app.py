@@ -3,7 +3,7 @@ import sqlite3
 
 app = Flask(__name__)
 
-# Database connection
+#coneccion a datos
 def get_db_connection():
     try:
         conn = sqlite3.connect('datosproductos.db')
@@ -12,22 +12,18 @@ def get_db_connection():
     except sqlite3.Error as e:
         print(f"Database connection error: {e}")
         return None
-
+    
+    
 @app.route('/')
-def portada():
-    return render_template('portada.html')
-
-@app.route('/index')
 def index():
     return render_template('index.html')
 
 @app.route('/search', methods=['GET'])
 def search():
-    query = request.args.get('q')
-    city = request.args.get('city')
-    stock = request.args.get('stock')
-    min_price = request.args.get('min_price')
-    max_price = request.args.get('max_price')
+    query = request.args.get('q')  # antes: 'query'
+    city = request.args.get('city')  # antes: 'ciudad'
+    min_price = request.args.get('min_price')  # antes: 'min_precio'
+    max_price = request.args.get('max_price')  # antes: 'max_precio'
     sort_by = request.args.get('sort_by')
     page = request.args.get('page', 1, type=int)
     per_page = request.args.get('per_page', 10, type=int)
@@ -44,10 +40,6 @@ def search():
         sql += "AND ciudad=? "
         count_sql += "AND ciudad=? "
         params.append(city)
-    if stock:
-        sql += "AND stock LIKE ? "
-        count_sql += "AND stock LIKE ? "
-        params.append(f"%{stock}%")
     if min_price:
         sql += "AND precio >= ? "
         count_sql += "AND precio >= ? "
@@ -62,17 +54,17 @@ def search():
     # Add pagination
     offset = (page - 1) * per_page
     sql += " LIMIT ? OFFSET ?"
-    params.extend([per_page, offset])
+    params_with_pagination = params + [per_page, offset]
 
     conn = get_db_connection()
     if conn is None:
         return "Error connecting to the database", 500
     cursor = conn.cursor()
-    cursor.execute(sql, params)
+    cursor.execute(sql, params_with_pagination)
     results = cursor.fetchall()
 
     # Get total count for pagination
-    cursor.execute(count_sql, params[:-2])
+    cursor.execute(count_sql, params)
     total = cursor.fetchone()[0]
 
     conn.close()

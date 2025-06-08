@@ -1,0 +1,357 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ShoppingEasy</title>
+    <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css">
+    <script src="https://code.jquery.com/jquery-3.5.1.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/popper.js@1.16.1/dist/umd/popper.min.js"></script>
+    <script src="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/js/bootstrap.min.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.3/css/all.min.css">
+    <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
+   <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+    <script>
+
+  //modal de mapa 
+  function getLocation() {
+    const city = document.getElementById('cityInput').value;
+    const apiKey = 'a8501d87d3a4be665744ed05fadfca59';
+    const url = `https://api.positionstack.com/v1/forward?access_key=${apiKey}&query=${city}`;
+
+    fetch(url)
+        .then(response => response.json())
+        .then(data => {
+            if (data.data.length > 0) {
+                const lat = data.data[0].latitude;
+                const lon = data.data[0].longitude;
+                showMap(lat, lon);
+                buscarFerreterias(lat, lon);
+            } else {
+                alert('Ciudad no encontrada');
+            }
+        })
+        .catch(error => console.error('Error:', error));
+}
+
+let mapInstance = null;
+function showMap(lat, lon) {
+    if (mapInstance) {
+        mapInstance.remove();
+    }
+    mapInstance = L.map('map').setView([lat, lon], 13);
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(mapInstance);
+    L.marker([lat, lon]).addTo(mapInstance).bindPopup('Ubicación seleccionada').openPopup();
+}
+
+// Busca ferreterías cercanas usando la API de OpenStreetMap Nominatim
+function buscarFerreterias(lat, lon) {
+    const radius = 2000; // metros
+    const url = `https://nominatim.openstreetmap.org/search?format=json&q=ferreteria&limit=10&viewbox=${lon-0.02},${lat+0.02},${lon+0.02},${lat-0.02}`;
+
+    fetch(url)
+        .then(response => response.json())
+        .then(data => {
+            let lista = '<b>Ferreterías cercanas:</b><ul>';
+            data.forEach(f => {
+                lista += `<li>${f.display_name}</li>`;
+                if (mapInstance) {
+                    L.marker([f.lat, f.lon], {icon: L.icon({iconUrl: 'https://cdn-icons-png.flaticon.com/512/854/854878.png', iconSize: [25, 25]})})
+                        .addTo(mapInstance)
+                        .bindPopup(f.display_name);
+                }
+            });
+            lista += '</ul>';
+            document.getElementById('hardware-list').innerHTML = lista;
+        })
+        .catch(error => {
+            document.getElementById('hardware-list').innerHTML = 'No se pudieron cargar ferreterías cercanas.';
+        });
+}
+
+        $(document).ready(function() {
+            var currentPage = 1;
+
+            function showSpinner() {
+                $('#spinner').show();
+            }
+            function hideSpinner() {
+                $('#spinner').hide();
+            }
+
+            function loadPage(page) {
+                showSpinner();
+                var query = $('#query').val();
+                var city = $('#city').val();
+                var stock = $('#stock').val();
+                var min_price = $('#min_price').val();
+                var max_price = $('#max_price').val();
+                var sort_by = $('#sort_by').val();
+                var per_page = $('#per_page').val();
+                var brand = $('#brand').val();
+
+                $.ajax({
+                    url: '/search',
+                    method: 'GET',
+                    data: {
+                        q: query,
+                        city: city,
+                        min_price: min_price,
+                        max_price: max_price,
+                        sort_by: sort_by,
+                        page: page,
+                        per_page: per_page
+                    },
+                    success: function(data) {
+                        $('#results tbody').html(''); // Solo limpia el cuerpo de la tabla
+
+                        if (data.productos.length === 0) {
+                            $('#results tbody').html('<tr><td colspan="4">No se encontraron resultados.</td></tr>');
+                        } else {
+                            for (var i = 0; i < data.productos.length; i++) {
+                                var product = data.productos[i];
+                                var row = `
+                <tr class="${i % 2 === 0 ? 'table-light' : 'table-secondary'}">
+                    <td>${product.nombre}</td>
+                    <td>${product.precio}</td>
+                    <td><a href="${product.enlace}" target="_blank" class="btn btn-primary btn-sm">Buy Now</a></td>
+                    <td>${product.ciudad}</td>
+                </tr>
+            `;
+                                $('#results tbody').append(row);
+                            }
+                        }
+
+                        // Update pagination
+                        currentPage = page;
+                        $('#prev-page').parent().toggleClass('disabled', currentPage === 1);
+                        $('#next-page').parent().toggleClass('disabled', data.productos.length < per_page);
+                        $('#results').show();
+                        $('#search-icon').hide();
+                        hideSpinner();
+                    },
+                    error: function(error) {
+                        console.error(error);
+                        $('#results tbody').html('<tr><td colspan="7">An error occurred. Please try again later.</td></tr>');
+                        hideSpinner();
+                    }
+                });
+            }
+
+            $('#searchForm').submit(function(event) {
+                event.preventDefault();
+                loadPage(1);
+            });
+
+            $('#prev-page').click(function(e) {
+                e.preventDefault();
+                if (currentPage > 1) {
+                    loadPage(currentPage - 1);
+                }
+            });
+
+            $('#next-page').click(function(e) {
+                e.preventDefault();
+                loadPage(currentPage + 1);
+            });
+
+            // Muestra de resultados
+            $('#results tbody').html();
+            $('#results').hide();
+        });
+        </script>
+    <style>
+        body {
+            background-color: #1F1C2E;
+            background-size: cover;
+            height: 100%;
+            margin: 0;
+            font-family: Arial, Helvetica, sans-serif;
+        }
+        .glass-container {
+            background: #1f2b3e;
+            margin: 100px auto;
+            border-radius: 10px;
+            padding: 20px;
+            box-shadow: 0 2px 5px rgba(97, 87, 87, 0.511);
+            backdrop-filter: blur(10px);
+            max-width: 1000px;
+        }
+        label{
+            color:#cee8ff;
+        }         
+        .Titulo{
+            justify-content: center;
+            display: flex;
+            flex-direction:column;
+            align-items: center;
+            animation:fadeIn 2s;
+        }
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+       
+         .titulo1{
+            font-size: 4.5rem;
+            font-weight: bold;
+            color: #4D648D;
+            text-shadow: 1px 1px #0a75d984;
+             animation: zoomIn 1s ease-in;
+         }
+        @keyframes zoomIn {
+            from { transform: scale(0.5); opacity: 0; }
+            to { transform: scale(1); opacity: 1; }
+        }
+
+        h2{
+          color:#4D648D;
+         }
+        h1 {
+            justify-content:right;
+            padding:30px;
+            color: #4D648D;
+            text-shadow: 1px 1px #0a75d984;
+        }       
+        .table-responsive{
+            font-size: 0.8rem;
+            color:#cee8ff;
+        }    
+        th{
+            color:#aaa;
+        }
+        button{
+            display:flex;
+            justify-content:center;
+            background: #3D5A80;
+        }
+
+        footer {
+            color:#dfe0e2;
+          }   
+          
+          .copyright {
+            margin-top:15px;
+            text-align:center;
+            font-size:13px;
+            color:#aaa;
+            margin-bottom:0;
+          }
+          
+          
+    </style>
+</head>
+<body>   
+    <div class=" Titulo">
+        <h1 class="titulo1">TOOLFINDER</h1>
+        <h2>Buscador de productos de ferreteria en línea</h2
+    <!--- Botón para abrir el modal --->
+
+<button type="button" class="btn btn-primary" data-toggle="modal" data-target="#mapModal">
+  Ver ferreterías mas cercanas
+</button>
+<!-- Modal de ubicación -->
+<div class="modal fade" id="mapModal" tabindex="-1" role="dialog" aria-labelledby="mapModalLabel" aria-hidden="true">
+  <div class="modal-dialog modal-lg" role="document">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="mapModalLabel">Ubicación de tiendas</h5>
+        <button type="button" class="close" data-dismiss="modal" aria-label="Cerrar">
+          <span aria-hidden="true">&times;</span>
+        </button>
+      </div>
+      <div class="modal-body">
+        <input type="text" id="cityInput" placeholder="Ingrese ciudad">
+        <button onclick="getLocation()" class="btn btn-secondary btn-sm">Buscar</button>
+        <div id="map" style="height: 300px; margin-top:10px;"></div>
+        <div id="hardware-list" class="mt-2"></div>
+      </div>
+    </div>
+  </div>
+</div>
+    </div>
+    <div class="container mt-4"> 
+        <div class="glass-container">
+            <form id="searchForm" class="mt-2">
+                <div class="form-row">
+                    <div class="form-group col-md-6 col-lg-4">
+                        <label for="query">Buscar por nombre:</label>
+                        <input type="text" class="form-control" id="query" name="q">
+                    </div>
+                    <div class="form-group col-md-6 col-lg-2">
+                   <label for="brand">Marca:</label>
+                   <input type="text" class="form-control" id="brand" name="brand">
+                   </div>
+                    <div class="form-group col-md-6 col-lg-3">
+                        <label for="city">Ciudad:</label>
+                        <select class="form-control" id="city" name="city">
+                            <option value="">Ciudad</option>
+                            <option value="Puerto Montt">Puerto Montt</option>
+                        </select>
+                    </div>
+                    <div class="form-group col-md-6 col-lg-2">
+                        <label for="sort_by">Ordenar por:</label>
+                        <select class="form-control" id="sort_by" name="sort_by">
+                            <option value="">No Ordenar</option>
+                            <option value="price_asc">Precio (menor a mayor)</option>
+                            <option value="price">Precio (mayor a menor)</option>
+                        </select>
+                    </div>
+                    <div class="form-group col-md-6 col-lg-1">
+                        <label for="per_page">Página:</label>
+                        <input type="number" class="form-control" id="per_page" name="per_page" value="10">
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group col-md-6 col-lg-3">
+                        <label for="min_price">Precio mínimo:</label>
+                        <input type="number" class="form-control" id="min_price" name="min_price">
+                    </div>
+                    <div class="form-group col-md-6 col-lg-3">
+                        <label for="max_price">Precio máximo:</label>
+                        <input type="number" class="form-control" id="max_price" name="max_price">
+                    </div>
+                </div>
+                <button type="submit" class="btn btn-primary">Buscar</button>
+            </form>
+            <!--tabla de resultados-->
+            <div class="table-responsive">
+                <table class="table" id="results">
+                    <thead>
+                         <tr>
+                            <th>Nombre</th>
+                            <th>Precio</th>
+                            <th>Enlace</th>
+                            <th>Ciudad</th>  
+                           </tr>
+                        </thead>
+                        <tbody>
+                        </tbody>
+                </table>
+            </div>
+            <nav>
+                <ul class="pagination justify-content-center" id="pagination">
+                    <li class="page-item">
+                        <a class="page-link" href="#" aria-label="Previous" id="prev-page">
+                            <span aria-hidden="true">&laquo;</span>
+                        </a>
+                    </li>
+                    <li class="page-item">
+                        <a class="page-link" href="#" aria-label="Next" id="next-page">
+                            <span aria-hidden="true">&raquo;</span>
+                        </a>
+                    </li>
+                </ul>
+            </nav>
+        </div>
+    </div>
+
+
+    <footer>
+        <p class="copyright">Company Name © 2024 Desarrollado por Karen Bustamante</p>
+    </footer>
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.2.1/jquery.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/twitter-bootstrap/4.1.3/js/bootstrap.bundle.min.js"></script>
+    
+</body>
+</html>
